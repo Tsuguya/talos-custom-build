@@ -1,0 +1,42 @@
+name: Check Talos Release
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Mon 18:00 JST
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Check for new Talos release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LATEST=$(curl -sf https://api.github.com/repos/siderolabs/talos/releases/latest | jq -r .tag_name)
+          echo "Latest Talos release: $LATEST"
+          echo "version=$LATEST" >> "$GITHUB_OUTPUT"
+
+          if gh release view "$LATEST" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            echo "Already built $LATEST — skipping"
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "New release $LATEST — triggering build"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    uses: ./.github/workflows/build.yml
+    with:
+      talos_version: ${{ needs.check.outputs.version }}
+    secrets: inherit
