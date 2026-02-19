@@ -119,6 +119,7 @@ jobs:
           CRANE_VERSION=$(curl -sf https://api.github.com/repos/google/go-containerregistry/releases/latest | jq -r .tag_name)
           curl -sL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" | tar xzf - crane
           sudo mv crane /usr/local/bin/
+          echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}" --password-stdin
 
           TAG=$(curl -sf http://${{ env.LOCAL_REGISTRY }}/v2/${{ env.USERNAME }}/kernel/tags/list | jq -r '.tags[0]')
           echo "Local kernel tag: $TAG"
@@ -159,6 +160,7 @@ jobs:
           CRANE_VERSION=$(curl -sf https://api.github.com/repos/google/go-containerregistry/releases/latest | jq -r .tag_name)
           curl -sL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" | tar xzf - crane
           sudo mv crane /usr/local/bin/
+          echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Checkout Talos
         uses: actions/checkout@v4
