@@ -22,18 +22,121 @@ env:
   ISCSI_TOOLS_IMAGE: ghcr.io/siderolabs/iscsi-tools:v0.2.0
 
 jobs:
-  build:
+  kernel:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 150
     steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check if kernel already exists
+        id: check
+        run: |
+          if docker manifest inspect ghcr.io/${{ env.USERNAME }}/kernel:${{ inputs.talos_version }} > /dev/null 2>&1; then
+            echo "Kernel image already exists — skipping build"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Kernel image not found — will build"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Free disk space
+        if: steps.check.outputs.exists != 'true'
         uses: jlumbroso/free-disk-space@main
         with:
           tool-cache: false
           swap-storage: false
 
       - name: Checkout this repository
+        if: steps.check.outputs.exists != 'true'
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        if: steps.check.outputs.exists != 'true'
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: network=host
+          buildkitd-flags: --allow-insecure-entitlement security.insecure
+
+      - name: Start local registry
+        if: steps.check.outputs.exists != 'true'
+        run: docker run -d -p 5005:5000 --name registry registry:2
+
+      - name: Checkout Talos
+        if: steps.check.outputs.exists != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: siderolabs/talos
+          ref: ${{ inputs.talos_version }}
+          path: talos
+
+      - name: Extract PKGS version
+        if: steps.check.outputs.exists != 'true'
+        id: pkgs
+        run: |
+          PKGS_VERSION=$(grep '^PKGS ' talos/Makefile | awk '{print $3}')
+          if [[ ! "$PKGS_VERSION" =~ ^v[0-9] ]]; then
+            echo "::error::Failed to extract PKGS version: $PKGS_VERSION"
+            exit 1
+          fi
+          PKGS_COMMIT=$(echo "$PKGS_VERSION" | sed 's/.*-g//')
+          echo "version=$PKGS_VERSION" >> "$GITHUB_OUTPUT"
+          echo "commit=$PKGS_COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout pkgs
+        if: steps.check.outputs.exists != 'true'
+        run: |
+          git clone https://github.com/siderolabs/pkgs.git pkgs
+          cd pkgs
+          git checkout ${{ steps.pkgs.outputs.commit }}
+
+      - name: Apply UFS kernel config
+        if: steps.check.outputs.exists != 'true'
+        run: bash scripts/apply-kernel-config.sh kernel/ufs.config pkgs/kernel/build/config-amd64
+
+      - name: Resolve kernel config dependencies
+        if: steps.check.outputs.exists != 'true'
+        working-directory: pkgs
+        run: make kernel-olddefconfig USERNAME=${{ env.USERNAME }} PLATFORM=linux/amd64
+
+      - name: Build kernel
+        if: steps.check.outputs.exists != 'true'
+        working-directory: pkgs
+        run: |
+          make kernel \
+            PLATFORM=linux/amd64 \
+            PUSH=true \
+            REGISTRY=${{ env.LOCAL_REGISTRY }} \
+            USERNAME=${{ env.USERNAME }}
+
+      - name: Push kernel to GHCR
+        if: steps.check.outputs.exists != 'true'
+        run: |
+          CRANE_VERSION=$(curl -sf https://api.github.com/repos/google/go-containerregistry/releases/latest | jq -r .tag_name)
+          curl -sL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" | tar xzf - crane
+          sudo mv crane /usr/local/bin/
+
+          TAG=$(curl -sf http://${{ env.LOCAL_REGISTRY }}/v2/${{ env.USERNAME }}/kernel/tags/list | jq -r '.tags[0]')
+          echo "Local kernel tag: $TAG"
+
+          crane copy --insecure \
+            ${{ env.LOCAL_REGISTRY }}/${{ env.USERNAME }}/kernel:${TAG} \
+            ghcr.io/${{ env.USERNAME }}/kernel:${{ inputs.talos_version }}
+
+  installer:
+    needs: kernel
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          swap-storage: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -51,6 +154,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install crane
+        run: |
+          CRANE_VERSION=$(curl -sf https://api.github.com/repos/google/go-containerregistry/releases/latest | jq -r .tag_name)
+          curl -sL "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" | tar xzf - crane
+          sudo mv crane /usr/local/bin/
+
       - name: Checkout Talos
         uses: actions/checkout@v4
         with:
@@ -62,49 +171,7 @@ jobs:
         id: pkgs
         run: |
           PKGS_VERSION=$(grep '^PKGS ' talos/Makefile | awk '{print $3}')
-          if [[ ! "$PKGS_VERSION" =~ ^v[0-9] ]]; then
-            echo "::error::Failed to extract PKGS version: $PKGS_VERSION"
-            exit 1
-          fi
-          PKGS_COMMIT=$(echo "$PKGS_VERSION" | sed 's/.*-g//')
           echo "version=$PKGS_VERSION" >> "$GITHUB_OUTPUT"
-          echo "commit=$PKGS_COMMIT" >> "$GITHUB_OUTPUT"
-          echo "PKGS version: $PKGS_VERSION (commit: $PKGS_COMMIT)"
-
-      - name: Checkout pkgs
-        run: |
-          git clone https://github.com/siderolabs/pkgs.git pkgs
-          cd pkgs
-          git checkout ${{ steps.pkgs.outputs.commit }}
-
-      - name: Apply UFS kernel config
-        run: bash scripts/apply-kernel-config.sh kernel/ufs.config pkgs/kernel/build/config-amd64
-
-      - name: Resolve kernel config dependencies
-        working-directory: pkgs
-        run: make kernel-olddefconfig USERNAME=${{ env.USERNAME }} PLATFORM=linux/amd64
-
-      - name: Build kernel
-        working-directory: pkgs
-        run: |
-          make kernel \
-            PLATFORM=linux/amd64 \
-            PUSH=true \
-            REGISTRY=${{ env.LOCAL_REGISTRY }} \
-            USERNAME=${{ env.USERNAME }}
-
-      - name: Get kernel tag
-        id: kernel
-        run: |
-          TAGS_JSON=$(curl -sf http://${{ env.LOCAL_REGISTRY }}/v2/${{ env.USERNAME }}/kernel/tags/list)
-          TAG=$(echo "$TAGS_JSON" | jq -r '.tags[0]')
-          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
-            echo "::error::Failed to get kernel tag: $TAGS_JSON"
-            exit 1
-          fi
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "image=${{ env.LOCAL_REGISTRY }}/${{ env.USERNAME }}/kernel:$TAG" >> "$GITHUB_OUTPUT"
-          echo "Kernel image: ${{ env.LOCAL_REGISTRY }}/${{ env.USERNAME }}/kernel:$TAG"
 
       - name: Build installer-base
         working-directory: talos
@@ -113,18 +180,7 @@ jobs:
             PUSH=true \
             REGISTRY=${{ env.LOCAL_REGISTRY }} \
             USERNAME=${{ env.USERNAME }} \
-            PKG_KERNEL=${{ steps.kernel.outputs.image }}
-
-      - name: Build and push installer to GHCR
-        working-directory: talos
-        run: |
-          make installer \
-            PUSH=true \
-            REGISTRY=ghcr.io \
-            USERNAME=${{ env.USERNAME }} \
-            PKG_KERNEL=${{ steps.kernel.outputs.image }} \
-            PLATFORM=linux/amd64 \
-            INSTALLER_ARCH=targetarch
+            PKG_KERNEL=ghcr.io/${{ env.USERNAME }}/kernel:${{ inputs.talos_version }}
 
       - name: Build imager
         working-directory: talos
@@ -133,9 +189,26 @@ jobs:
             PUSH=true \
             REGISTRY=${{ env.LOCAL_REGISTRY }} \
             USERNAME=${{ env.USERNAME }} \
-            PKG_KERNEL=${{ steps.kernel.outputs.image }} \
+            PKG_KERNEL=ghcr.io/${{ env.USERNAME }}/kernel:${{ inputs.talos_version }} \
             PLATFORM=linux/amd64 \
             INSTALLER_ARCH=targetarch
+
+      - name: Build installer
+        working-directory: talos
+        run: |
+          make installer \
+            PUSH=true \
+            REGISTRY=${{ env.LOCAL_REGISTRY }} \
+            USERNAME=${{ env.USERNAME }} \
+            PKG_KERNEL=ghcr.io/${{ env.USERNAME }}/kernel:${{ inputs.talos_version }} \
+            PLATFORM=linux/amd64 \
+            INSTALLER_ARCH=targetarch
+
+      - name: Push installer to GHCR
+        run: |
+          crane copy --insecure \
+            ${{ env.LOCAL_REGISTRY }}/${{ env.USERNAME }}/installer:${{ inputs.talos_version }} \
+            ghcr.io/${{ env.USERNAME }}/installer:${{ inputs.talos_version }}
 
       - name: Build ISO
         working-directory: talos
