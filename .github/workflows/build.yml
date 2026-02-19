@@ -226,7 +226,7 @@ jobs:
           tag_name: ${{ inputs.talos_version }}
           name: Talos ${{ inputs.talos_version }}
           body: |
-            Custom Talos build with UFS support for Minisforum S100.
+            Custom Talos build with x86 UFS storage support.
 
             - Talos: ${{ inputs.talos_version }}
             - PKGS: ${{ steps.pkgs.outputs.version }}
