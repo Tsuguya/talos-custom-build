@@ -46,10 +46,12 @@ jobs:
 
       - name: Free disk space
         if: steps.check.outputs.exists != 'true'
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          swap-storage: false
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup
+          sudo apt-get remove -y google-cloud-cli microsoft-edge-stable google-chrome-stable dotnet-sdk-* aspnetcore-* 2>/dev/null || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          docker system prune --volumes -a -f
 
       - name: Checkout this repository
         if: steps.check.outputs.exists != 'true'
@@ -134,10 +136,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          swap-storage: false
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup
+          sudo apt-get remove -y google-cloud-cli microsoft-edge-stable google-chrome-stable dotnet-sdk-* aspnetcore-* 2>/dev/null || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          docker system prune --volumes -a -f
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
