@@ -224,6 +224,14 @@ jobs:
             REGISTRY=${{ env.LOCAL_REGISTRY }} \
             USERNAME=${{ env.USERNAME }}
 
+      - name: Extract PXE assets from ISO
+        run: |
+          sudo apt-get install -y p7zip-full
+          cd talos/_out
+          7z x metal-amd64.iso -o/tmp/iso boot/vmlinuz boot/initramfs.xz
+          cp /tmp/iso/boot/vmlinuz vmlinuz-amd64
+          cp /tmp/iso/boot/initramfs.xz initramfs-amd64.xz
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -235,4 +243,7 @@ jobs:
             - Talos: ${{ inputs.talos_version }}
             - PKGS: ${{ steps.pkgs.outputs.version }}
             - System extensions: ${{ env.ISCSI_TOOLS_IMAGE }}
-          files: talos/_out/metal-amd64.iso
+          files: |
+            talos/_out/metal-amd64.iso
+            talos/_out/vmlinuz-amd64
+            talos/_out/initramfs-amd64.xz
