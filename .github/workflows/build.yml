@@ -130,7 +130,7 @@ jobs:
             ${{ env.LOCAL_REGISTRY }}/${{ env.USERNAME }}/kernel:${TAG} \
             ghcr.io/${{ env.USERNAME }}/kernel:${{ inputs.talos_version }}
 
-  installer:
+  imager:
     needs: kernel
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -188,6 +188,12 @@ jobs:
             USERNAME=${{ env.USERNAME }} \
             PKG_KERNEL=ghcr.io/${{ env.USERNAME }}/kernel:${{ inputs.talos_version }}
 
+      - name: Push installer-base to GHCR
+        run: |
+          crane copy --insecure \
+            ${{ env.LOCAL_REGISTRY }}/${{ env.USERNAME }}/installer-base:${{ inputs.talos_version }} \
+            ghcr.io/${{ env.USERNAME }}/installer-base:${{ inputs.talos_version }}
+
       - name: Build imager
         working-directory: talos
         run: |
@@ -199,50 +205,22 @@ jobs:
             PLATFORM=linux/amd64 \
             INSTALLER_ARCH=targetarch
 
-      - name: Build installer
-        working-directory: talos
-        run: |
-          make installer \
-            PUSH=true \
-            REGISTRY=${{ env.LOCAL_REGISTRY }} \
-            USERNAME=${{ env.USERNAME }} \
-            PKG_KERNEL=ghcr.io/${{ env.USERNAME }}/kernel:${{ inputs.talos_version }} \
-            PLATFORM=linux/amd64 \
-            INSTALLER_ARCH=targetarch
-
-      - name: Push installer to GHCR
+      - name: Push imager to GHCR
         run: |
           crane copy --insecure \
-            ${{ env.LOCAL_REGISTRY }}/${{ env.USERNAME }}/installer:${{ inputs.talos_version }} \
-            ghcr.io/${{ env.USERNAME }}/installer:${{ inputs.talos_version }}
+            ${{ env.LOCAL_REGISTRY }}/${{ env.USERNAME }}/imager:${{ inputs.talos_version }} \
+            ghcr.io/${{ env.USERNAME }}/imager:${{ inputs.talos_version }}
 
-      - name: Build ISO
-        working-directory: talos
-        run: |
-          make image-iso \
-            IMAGER_ARGS="--arch amd64 --system-extension-image ${{ env.ISCSI_TOOLS_IMAGE }}" \
-            REGISTRY=${{ env.LOCAL_REGISTRY }} \
-            USERNAME=${{ env.USERNAME }}
-
-      - name: Extract PXE assets from ISO
-        run: |
-          sudo apt-get install -y p7zip-full
-          7z x talos/_out/metal-amd64.iso -o/tmp/iso boot/vmlinuz boot/initramfs.xz
-          sudo cp /tmp/iso/boot/vmlinuz talos/_out/vmlinuz-amd64
-          sudo cp /tmp/iso/boot/initramfs.xz talos/_out/initramfs-amd64.xz
-
-      - name: Create GitHub Release
+      - name: Create pre-release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.talos_version }}
           name: Talos ${{ inputs.talos_version }}
+          prerelease: true
           body: |
-            Custom Talos build with x86 UFS storage support.
+            Custom Talos build with UFS + SecureBoot support.
 
             - Talos: ${{ inputs.talos_version }}
             - PKGS: ${{ steps.pkgs.outputs.version }}
-            - System extensions: ${{ env.ISCSI_TOOLS_IMAGE }}
-          files: |
-            talos/_out/metal-amd64.iso
-            talos/_out/vmlinuz-amd64
-            talos/_out/initramfs-amd64.xz
+
+            Waiting for SecureBoot signing...
