@@ -59,7 +59,7 @@ jobs:
 
       - name: Set up Docker Buildx
         if: steps.check.outputs.exists != 'true'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           driver-opts: network=host
           buildkitd-flags: --allow-insecure-entitlement security.insecure
@@ -144,7 +144,7 @@ jobs:
           docker system prune --volumes -a -f
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
         with:
           driver-opts: network=host
           buildkitd-flags: --allow-insecure-entitlement security.insecure
