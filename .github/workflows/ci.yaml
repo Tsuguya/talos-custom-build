@@ -17,14 +17,14 @@ jobs:
   # ワークフローの lint は 6 リポジトリ共通なので home-actions に寄せてある。
   # ツールのピンは向こう側にあり、ここは呼び先の SHA を追うだけ。
   lint-workflows:
-    uses: Tsuguya/home-actions/.github/workflows/lint-workflows.yml@bd99e01e99bcce1b845aa7abae3b3ed3b61f464f # v1.1.0
+    uses: Tsuguya/home-actions/.github/workflows/lint-workflows.yml@10834ead7a2c2ca71677a6b818cd066d329eacbb # v1.2.0
     permissions:
       contents: read
 
   # Renovate 設定の検証。Renovate は知らないキーを黙って捨てるので（PR も警告も
   # 出ない）、バリデータだけがこの層の間違いを検出できる。
   lint-renovate:
-    uses: Tsuguya/home-actions/.github/workflows/lint-renovate.yml@bd99e01e99bcce1b845aa7abae3b3ed3b61f464f # v1.1.0
+    uses: Tsuguya/home-actions/.github/workflows/lint-renovate.yml@10834ead7a2c2ca71677a6b818cd066d329eacbb # v1.2.0
     permissions:
       contents: read
 
