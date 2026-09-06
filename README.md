@@ -72,7 +72,7 @@ SecureBoot プロファイルはデフォルトで `lockdown=confidentiality` �
 
 ### UEFI キー登録手順
 
-→ [home-cluster/docs/secureboot.md](https://github.com/Tsuguya/home-cluster/blob/main/docs/secureboot.md)
+→ [home-cluster/docs/secureboot.md](https://github.com/Tsuguya-HC/home-cluster/blob/main/docs/secureboot.md)
 
 ## System Extensions
 
@@ -93,7 +93,7 @@ siderolabs/extensions `fb4eb042` で iscsi-tools がホスト rootfs 配置か�
 ghcr.io/tsuguya/iscsi-tools:v0.2.0-pre-consolidation
 ```
 
-→ 詳細: [home-cluster/docs/known-issues.md](https://github.com/Tsuguya/home-cluster/blob/main/docs/known-issues.md#iscsi-tools-extension-のホストバイナリ消失)
+→ 詳細: [home-cluster/docs/known-issues.md](https://github.com/Tsuguya-HC/home-cluster/blob/main/docs/known-issues.md#iscsi-tools-extension-のホストバイナリ消失)
 
 ## Argo Workflows 関連ファイル (home-cluster)
 
