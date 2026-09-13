@@ -1,10 +1,14 @@
 # talos-custom-build
 
-Talos Linux のカスタムビルド。標準カーネルにない UFS ストレージサポートを追加し、SecureBoot 署名を行う。
+Talos Linux のカスタムビルド。SecureBoot 署名を行い、UFS の追加オプションを足す。
 
 ## なぜカスタムビルドが必要か
 
-CP ノード (Minisforum S100) のストレージが UFS (`8086:54ff`, Alder Lake-N UFS Controller) で、標準 Talos カーネルでは `CONFIG_SCSI_UFSHCD is not set` のため認識されない。
+**SecureBoot**: 自前の鍵で署名した UKI と、キー登録用の auto-enrollment ISO を作る。署名鍵はクラスタ内 (1Password) にあり GitHub には渡さないので、署名は Argo Workflows 側で行う。
+
+**UFS の追加オプション**: 元々の動機は CP ノード (Minisforum S100) の UFS ストレージ (`8086:54ff`, Alder Lake-N UFS Controller) が標準カーネルで `CONFIG_SCSI_UFSHCD is not set` だったこと。**この前提は Talos v1.14 で変わり、上流が `CONFIG_SCSI_UFSHCD=m` / `CONFIG_SCSI_UFSHCD_PCI=m` を持つようになった**（v1.13 系には無い）。いま `kernel/ufs.config` が足しているのは、上流が設定しない `SCSI_UFS_BSG` / `SCSI_UFS_DWC_TC_PCI` / `SCSI_UFSHCD_PLATFORM` の 3 つ。
+
+現時点でクラスタに UFS のノードは無い（CP は 2026-08-15 に AOOSTAR N1 Pro / SATA M.2 へ置換、worker は NVMe と SATA）。UFS のハードウェアを再び入れる予定があるためカーネル側は残してある。
 
 ## ビルドパイプライン
 
