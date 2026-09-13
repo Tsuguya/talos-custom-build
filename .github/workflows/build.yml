@@ -24,7 +24,7 @@ concurrency:
 
 env:
   LOCAL_REGISTRY: localhost:5005
-  USERNAME: tsuguya
+  USERNAME: tsuguya-hc
   ISCSI_TOOLS_IMAGE: ghcr.io/siderolabs/iscsi-tools:v0.2.0
 
 jobs:
@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 150
     permissions:
       contents: read # 自リポの scripts/ を checkout する
-      packages: write # ghcr.io/tsuguya/kernel へ push する
+      packages: write # ghcr.io/tsuguya-hc/kernel へ push する
     steps:
       - name: Login to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -167,7 +167,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write # softprops/action-gh-release がプレリリースを作る
-      packages: write # ghcr.io/tsuguya/{installer-base,imager} へ push する
+      packages: write # ghcr.io/tsuguya-hc/{installer-base,imager} へ push する
     steps:
       - name: Free disk space
         run: |
